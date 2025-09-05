@@ -25,9 +25,9 @@ client.once('ready', async () => {
   // Initialize database
   await initializeDatabase();
   
-  // Deploy commands (guild-specific for development)
-  if (process.env.CLIENT_ID && process.env.DISCORD_TOKEN && process.env.GUILD_ID) {
-    await deployCommands(process.env.CLIENT_ID, process.env.DISCORD_TOKEN, process.env.GUILD_ID);
+  // Deploy commands globally to all servers
+  if (process.env.CLIENT_ID && process.env.DISCORD_TOKEN) {
+    await deployCommands(process.env.CLIENT_ID, process.env.DISCORD_TOKEN);
   }
 });
 
