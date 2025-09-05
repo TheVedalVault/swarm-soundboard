@@ -1,0 +1,85 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Sound {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  filename    String
+  category    String
+  person      String
+  duration    Float
+  fileSize    Int
+  playCount   Int      @default(0)
+  addedAt     DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  queueItems     QueueItem[]
+  playHistory    PlayHistory[]
+  reactionSounds ReactionSound[]
+
+  @@map("sounds")
+}
+
+model QueueItem {
+  id          String   @id @default(cuid())
+  soundId     String
+  guildId     String
+  channelId   String
+  requestedBy String
+  requestedAt DateTime @default(now())
+  position    Int
+
+  // Relations
+  sound       Sound    @relation(fields: [soundId], references: [id], onDelete: Cascade)
+
+  @@map("queue_items")
+}
+
+model PlayHistory {
+  id        String   @id @default(cuid())
+  soundId   String
+  guildId   String
+  userId    String
+  playedAt  DateTime @default(now())
+
+  // Relations
+  sound     Sound    @relation(fields: [soundId], references: [id], onDelete: Cascade)
+
+  @@map("play_history")
+}
+
+model ServerConfig {
+  id                String   @id @default(cuid())
+  guildId           String   @unique
+  enabledCategories String   @default("cursed,reactions,screams,misc")
+  enabledPeople     String   @default("vedal,neuro,evil,camila,cerber,mini,misc")
+  disabledSounds    String   @default("")
+  volume            Float    @default(0.5)
+  reactToPlayEnabled Boolean @default(true)
+  maxQueueSize      Int      @default(10)
+  allowedRoles      String   @default("")  // Comma-separated role IDs, empty = everyone
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@map("server_configs")
+}
+
+model ReactionSound {
+  id      String @id @default(cuid())
+  guildId String
+  emoji   String
+  soundId String
+  
+  // Relations
+  sound   Sound  @relation(fields: [soundId], references: [id], onDelete: Cascade)
+  
+  @@unique([guildId, emoji])
+  @@map("reaction_sounds")
+}
