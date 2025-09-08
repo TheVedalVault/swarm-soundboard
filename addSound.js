@@ -2,6 +2,7 @@ import { PrismaClient } from '@prisma/client';
 import fs from 'fs';
 import path from 'path';
 import dotenv from 'dotenv';
+import ffprobe from 'node-ffprobe';
 
 dotenv.config();
 
@@ -17,8 +18,32 @@ async function addSound(name, filename, category, person) {
   // Get file stats
   const stats = fs.statSync(soundPath);
   
-  // For now, we'll estimate duration as 0
-  const duration = 0;
+  // Extract audio metadata using ffprobe
+  let duration = 0;
+  let metadata = {};
+  
+  try {
+    console.log(`📊 Analyzing audio file: ${filename}`);
+    const probeData = await ffprobe(soundPath);
+    
+    if (probeData.streams && probeData.streams.length > 0) {
+      const audioStream = probeData.streams.find(stream => stream.codec_type === 'audio');
+      if (audioStream) {
+        duration = parseFloat(audioStream.duration) || 0;
+        metadata = {
+          codec: audioStream.codec_name,
+          bitrate: audioStream.bit_rate,
+          sampleRate: audioStream.sample_rate,
+          channels: audioStream.channels
+        };
+        
+        console.log(`✅ Duration: ${duration.toFixed(2)}s, Codec: ${metadata.codec}, Bitrate: ${metadata.bitrate}`);
+      }
+    }
+  } catch (error) {
+    console.warn(`⚠️ Could not extract metadata from ${filename}: ${error.message}`);
+    console.warn('📝 Proceeding with duration = 0');
+  }
 
   try {
     const sound = await prisma.sound.create({
@@ -33,6 +58,7 @@ async function addSound(name, filename, category, person) {
     });
 
     console.log(`✅ Added sound: ${name} (${filename})`);
+    console.log(`📈 Details: ${duration.toFixed(2)}s, ${(stats.size / 1024).toFixed(1)}KB`);
     return sound;
   } catch (error) {
     console.error('❌ Error adding sound:', error);

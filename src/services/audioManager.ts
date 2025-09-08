@@ -12,6 +12,7 @@ import { VoiceChannel } from 'discord.js';
 import { prisma } from './database.js';
 import fs from 'fs';
 import path from 'path';
+import Fuse from 'fuse.js';
 
 export class AudioManager {
   private connections: Map<string, VoiceConnection> = new Map();
@@ -82,10 +83,26 @@ export class AudioManager {
 
   async playSound(guildId: string, soundName: string, requestedBy: string, isReaction: boolean = false): Promise<boolean> {
     try {
-      // Find sound in database
-      const sound = await prisma.sound.findFirst({
-        where: { name: { contains: soundName } }
+      // First try exact match
+      let sound = await prisma.sound.findFirst({
+        where: { name: { equals: soundName } }
       });
+
+      // If no exact match, try fuzzy search
+      if (!sound) {
+        const allSounds = await prisma.sound.findMany();
+        const fuse = new Fuse(allSounds, {
+          keys: ['name'],
+          threshold: 0.2, // Stricter for sound selection
+          includeScore: true
+        });
+        
+        const fuzzyResults = fuse.search(soundName);
+        if (fuzzyResults.length > 0) {
+          sound = fuzzyResults[0].item;
+          console.log(`🔍 Fuzzy match: "${soundName}" → "${sound.name}"`);
+        }
+      }
 
       if (!sound) {
         return false;
@@ -227,6 +244,42 @@ export class AudioManager {
     this.queues.set(guildId, []);
   }
 
+  removeFromQueue(guildId: string, index: number): boolean {
+    const queue = this.queues.get(guildId);
+    if (!queue || index < 0 || index >= queue.length) {
+      return false;
+    }
+    
+    queue.splice(index, 1);
+    return true;
+  }
+
+  moveInQueue(guildId: string, fromIndex: number, toIndex: number): boolean {
+    const queue = this.queues.get(guildId);
+    if (!queue || fromIndex < 0 || fromIndex >= queue.length || 
+        toIndex < 0 || toIndex >= queue.length) {
+      return false;
+    }
+    
+    const [item] = queue.splice(fromIndex, 1);
+    queue.splice(toIndex, 0, item);
+    return true;
+  }
+
+  shuffleQueue(guildId: string): boolean {
+    const queue = this.queues.get(guildId);
+    if (!queue || queue.length <= 1) {
+      return false;
+    }
+    
+    // Fisher-Yates shuffle algorithm
+    for (let i = queue.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [queue[i], queue[j]] = [queue[j], queue[i]];
+    }
+    return true;
+  }
+
   stopPlaying(guildId: string) {
     const player = this.players.get(guildId);
     if (player) {
@@ -259,6 +312,7 @@ interface QueuedSound {
     filename: string;
     category: string;
     person: string;
+    duration: number;
   };
   requestedBy: string;
   requestedAt: Date;

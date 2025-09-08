@@ -9,6 +9,9 @@
     "start": "node dist/index.js",
     "dev": "npm run build && node dist/index.js",
     "add-sound": "node addSound.js",
+    "add-sounds-interactive": "node addSoundsInteractive.js",
+    "update-durations": "node updateDurations.js",
+    "deploy-commands": "npm run build && node deployCommands.js",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -26,7 +29,9 @@
     "dotenv": "^17.2.2",
     "ffmpeg-static": "^5.2.0",
     "fluent-ffmpeg": "^2.1.3",
+    "fuse.js": "^7.1.0",
     "libsodium-wrappers": "^0.7.15",
+    "node-ffprobe": "^3.0.0",
     "prisma": "^6.15.0"
   },
   "devDependencies": {

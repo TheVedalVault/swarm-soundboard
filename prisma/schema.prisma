@@ -23,6 +23,7 @@ model Sound {
   queueItems     QueueItem[]
   playHistory    PlayHistory[]
   reactionSounds ReactionSound[]
+  userFavorites  UserFavorite[]
 
   @@map("sounds")
 }
@@ -82,4 +83,17 @@ model ReactionSound {
   
   @@unique([guildId, emoji])
   @@map("reaction_sounds")
+}
+
+model UserFavorite {
+  id      String   @id @default(cuid())
+  userId  String
+  soundId String
+  addedAt DateTime @default(now())
+  
+  // Relations
+  sound   Sound    @relation(fields: [soundId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, soundId])
+  @@map("user_favorites")
 }

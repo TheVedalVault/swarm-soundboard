@@ -1,6 +1,7 @@
 import { SlashCommandBuilder, ChatInputCommandInteraction, GuildMember, VoiceChannel, AutocompleteInteraction } from 'discord.js';
 import { audioManager } from '../services/audioManager.js';
 import { prisma } from '../services/database.js';
+import Fuse from 'fuse.js';
 
 export const data = new SlashCommandBuilder()
   .setName('play')
@@ -66,25 +67,44 @@ export async function autocomplete(interaction: AutocompleteInteraction) {
   const focusedValue = interaction.options.getFocused().toLowerCase();
   
   try {
-    // Search for sounds that match the input
-    const sounds = await prisma.sound.findMany({
-      where: {
-        name: {
-          contains: focusedValue
-        }
-      },
+    // Get all sounds for fuzzy search
+    const allSounds = await prisma.sound.findMany({
       orderBy: [
-        { playCount: 'desc' }, // Prioritize popular sounds
-        { name: 'asc' }        // Then alphabetical
-      ],
-      take: 25 // Discord limits autocomplete to 25 options
+        { playCount: 'desc' },
+        { name: 'asc' }
+      ]
     });
 
+    // Configure Fuse.js for fuzzy searching
+    const fuse = new Fuse(allSounds, {
+      keys: [
+        { name: 'name', weight: 0.7 },
+        { name: 'person', weight: 0.2 },
+        { name: 'category', weight: 0.1 }
+      ],
+      threshold: 0.3, // Lower = more strict matching
+      includeScore: true,
+      ignoreLocation: true
+    });
+
+    let results: any[];
+    if (focusedValue.length === 0) {
+      // If no input, show most popular sounds
+      results = allSounds.slice(0, 25).map((sound: any) => ({ item: sound, score: 0 }));
+    } else {
+      // Use fuzzy search
+      results = fuse.search(focusedValue).slice(0, 25);
+    }
+
     // Format results for Discord
-    const choices = sounds.map(sound => ({
-      name: `${sound.name} (${sound.person}) [${sound.category}]`,
-      value: sound.name
-    }));
+    const choices = results.map((result: any) => {
+      const sound = result.item;
+      const relevanceIndicator = result.score && result.score > 0.1 ? ' 🔍' : '';
+      return {
+        name: `${sound.name} (${sound.person}) [${sound.category}]${relevanceIndicator}`,
+        value: sound.name
+      };
+    });
 
     await interaction.respond(choices);
   } catch (error) {
